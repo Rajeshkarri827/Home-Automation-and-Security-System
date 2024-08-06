@@ -1,0 +1,251 @@
+#include <WiFi.h>
+#include "time.h"
+#include "ThingSpeak.h"
+#include <LiquidCrystal.h>
+#include "DHT.h"
+#define DHT11PIN 4
+DHT dht(DHT11PIN, DHT11);
+const int rs = 13, en = 12, d4 = 14, d5 = 27, d6 = 26, d7 = 25;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+int lgt=23;
+int fan=21;
+int lock=22;
+int ir=17;
+int gs=34;
+int fs=5;
+int ts=18;
+int buz=19;
+int tss=0;
+int ss=0;
+int x,cnt=0;
+int rfid;
+int kk=0;
+unsigned long lastTime = 0;
+unsigned long timerDelay = 16000;
+WiFiClient  client;
+const int FieldNumber1 = 1;
+int ii=0;
+const char* ssid       = "SRC 24G";
+const char* password   = "src@internet";
+String strs[14]={"321453","3WOJXCB6P6G6KETL","325027","NO2EZ787T6OV1X14","SRC 24G","src@internet","0","0","0","0","0","0","0","0"};
+int statusCode = 0;
+void setup() {
+  // initialize serial communication at 9600 bits per second:
+  Serial.begin(115200);
+  pinMode(lgt,OUTPUT);
+  pinMode(fan,OUTPUT);
+  pinMode(lock,OUTPUT);
+  pinMode(buz,OUTPUT);
+  pinMode(fs,INPUT);
+  pinMode(ir,INPUT);
+  pinMode(ts,INPUT);
+  ThingSpeak.begin(client);
+  dht.begin();
+  delay(100);
+  lcd.begin(16,2);
+  lcd.print("WELCOME");
+  digitalWrite(lgt,1);
+  digitalWrite(fan,1);
+  digitalWrite(lock,1);
+
+  Serial.printf("Connecting to %s ", ssid);
+  WiFi.begin(ssid, password);
+  ii=0;
+  while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      ii=ii+1;
+      Serial.print(".");
+      if(ii>50)
+      {
+        break;
+      }
+  }
+  if(ii>50)
+  {
+    lcd.clear();
+    lcd.print("Connection Failed");
+    delay(2000);
+  }
+  else
+  {
+      lcd.clear();
+    lcd.print("Connected..");
+  Serial.println(" CONNECTED");
+  delay(2000);
+  }
+}
+
+// the loop routine runs over and over again forever:
+void loop() {
+  // read the input on analog pin 0:
+
+  float humi = dht.readHumidity();
+  float temp = dht.readTemperature();
+
+  int fval=digitalRead(fs);
+  int ival=digitalRead(ir);
+  int tval=digitalRead(ts);
+  int gval=analogRead(gs)/100;
+  
+  Serial.print("Temperature: ");
+  Serial.print(temp);
+  Serial.print("  ");
+  Serial.print("F: ");
+  Serial.print(fval);
+  Serial.print("  ");
+    Serial.print("I: ");
+  Serial.print(ival);
+  Serial.print("  ");
+    Serial.print("T: ");
+  Serial.print(tval);
+  Serial.print("  ");
+    Serial.print("G: ");
+  Serial.print(gval);
+  Serial.print("  ");
+  Serial.print("Humidity: ");
+  Serial.println(humi);
+  if(Serial.available())
+  {
+    String card=Serial.readStringUntil('\n');
+    Serial.println(card);
+  }
+
+  lcd.clear();
+  lcd.print("T:"+String(int(temp)) + " H:"+String(int(humi)) + " I:"+String(ival));
+  lcd.setCursor(0,1);
+  lcd.print("TC:"+String(ss)+ " G:"+String(gval) +" F:"+String(fval));
+  
+      lcd.setCursor(14,1);
+    lcd.print(x);
+    if((fval==0 || gval>30 || ival==0) && kk==0)
+    {
+      Serial.print("1");
+      kk=1;
+    }
+    if(fval==1 && gval<28 && ival==0)
+    {
+      kk=0;
+    }
+    if(temp>35)
+    {
+      digitalWrite(fan,0);
+    }
+  if(temp>35 || humi<30 || fval==0 || gval>30 || ival==0)
+  {
+    digitalWrite(buz,1);
+    delay(500);
+    digitalWrite(buz,0);
+  }
+  if((tss==1 && tval==1) || ss==1)
+  {
+    ss=1;
+    digitalWrite(buz,1);
+  }
+
+cnt=cnt+1;
+if(cnt>15)
+{
+  cnt=0;
+ ThingSpeak.setField(1, String(temp));
+ ThingSpeak.setField(2, String(humi));
+ ThingSpeak.setField(3, String(ival));
+ ThingSpeak.setField(4, String(tval));
+ ThingSpeak.setField(5, String(gval));
+ ThingSpeak.setField(6, String(fval));
+ ThingSpeak.setField(7, String(rfid));
+// ThingSpeak.setField(8, strs[13]);
+ const char* string0 = strs[0].c_str();
+ const char* string1 = strs[1].c_str();
+ int y = ThingSpeak.writeFields(atol(string0), string1);
+}
+
+  
+  delay(1000);
+
+
+
+
+
+
+  const char* string2 = strs[2].c_str();
+  const char* string3 = strs[3].c_str();
+  x = ThingSpeak.readLongField(atol(string2), FieldNumber1, string3);
+  statusCode = ThingSpeak.getLastReadStatus();
+  if (statusCode == 200)
+  {
+
+      if(x==1)
+    {
+      digitalWrite(lgt,0);
+      delay(200);
+    }
+
+     if(x==2)
+    {
+      digitalWrite(lgt,1);
+      delay(200);
+    }
+
+    if(x==3)
+    {
+      digitalWrite(fan,0);
+      delay(200);
+    }
+
+        if(x==4)
+    {
+      digitalWrite(fan,1);
+      delay(200);
+    }
+
+        if(x==5)
+    {
+      digitalWrite(lock,0);
+      delay(200);
+    }
+
+     if(x==6)
+    {
+      digitalWrite(lock,1);
+      delay(200);
+    }
+
+           if(x==7)
+    {
+      tss=1;
+      delay(200);
+    }
+
+     if(x==8)
+    {
+      tss=0;
+      delay(200);
+    }
+
+     if(x==9)
+    {
+      tss=0;
+       ss=0;
+    digitalWrite(buz,0);
+      delay(200);
+    }
+    
+  }
+  
+ if(Serial.available())
+ {
+  int xx=Serial.read();
+  if(xx=='1')
+  {
+    digitalWrite(lock,0);
+    delay(5000);
+    digitalWrite(lock,1);
+  }
+  else
+  {
+    digitalWrite(buz,1);
+    delay(1000);
+    digitalWrite(buz,0);
+  }
+ }
+}
